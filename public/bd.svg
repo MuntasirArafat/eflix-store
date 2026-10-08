@@ -1,0 +1,7 @@
+<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+	<style>
+		.s0 { fill: #ff4949 } 
+	</style>
+	<rect width="512" height="512" id="Color Fill 1" style="fill: #007738"/>
+	<path id="Shape 1" fill-rule="evenodd" class="s0" d="m256 385c-73.55 0-133-57.89-133-129.5 0-71.61 59.45-129.5 133-129.5 73.55 0 133 57.89 133 129.5 0 71.61-59.45 129.5-133 129.5z"/>
+</svg>
