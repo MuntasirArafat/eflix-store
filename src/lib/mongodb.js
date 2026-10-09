@@ -1,3 +1,4 @@
+
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 import Admin from "@/models/Admin";
@@ -8,59 +9,75 @@ if (!MONGODB_URI) {
   throw new Error("MONGODB_URI is not defined");
 }
 
-let cached = global.mongoose;
+const globalCache = globalThis;
 
-if (!cached) {
-  cached = global.mongoose = {
+if (!globalCache.mongoose) {
+  globalCache.mongoose = {
     conn: null,
     promise: null,
   };
 }
 
+const cached = globalCache.mongoose;
+
 async function createDefaultAdmin() {
-  const defaultEmail =
-    process.env.ADMIN_EMAIL || "admin@example.com";
+  const defaultEmail = (
+    process.env.ADMIN_EMAIL || "admin@example.com"
+  ).toLowerCase();
 
-  const defaultPassword =
-    process.env.ADMIN_PASSWORD || "admin123456";
+  const defaultPassword = process.env.ADMIN_PASSWORD;
 
-  const existingAdmin = await Admin.findOne({
-    email: defaultEmail.toLowerCase(),
-  });
-
-  if (existingAdmin) {
+  // Don't silently create an insecure production admin.
+  if (!defaultPassword) {
+    console.warn(
+      "ADMIN_PASSWORD is not configured; skipping default admin creation."
+    );
     return;
   }
 
-  const hashedPassword = await bcrypt.hash(
-    defaultPassword,
-    12
-  );
+  const existingAdmin = await Admin.findOne({
+    email: defaultEmail,
+  });
+
+  if (existingAdmin) return;
+
+  const hashedPassword = await bcrypt.hash(defaultPassword, 12);
 
   await Admin.create({
     name: "Administrator",
-    email: defaultEmail.toLowerCase(),
+    email: defaultEmail,
     password: hashedPassword,
   });
 
-  console.log(`Default admin created: ${defaultEmail}`);
+  console.log("Default admin created.");
 }
 
 async function connectDB() {
-  if (cached.conn) {
+  if (cached.conn && mongoose.connection.readyState === 1) {
     return cached.conn;
   }
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI);
+    cached.promise = mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
+    });
   }
 
-  cached.conn = await cached.promise;
+  try {
+    cached.conn = await cached.promise;
+    await createDefaultAdmin();
+    return cached.conn;
+  } catch (error) {
+    cached.promise = null;
+    cached.conn = null;
 
-  // Create default admin on first DB connection
-  await createDefaultAdmin();
+    console.error("MongoDB initialization failed:", {
+      name: error?.name,
+      message: error?.message,
+    });
 
-  return cached.conn;
+    throw error;
+  }
 }
 
 export default connectDB;
